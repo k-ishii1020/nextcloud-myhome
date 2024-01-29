@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  nextcloud_db:
+    image: yobasystems/alpine-mariadb
+    container_name: nextcloud_db
+    volumes:
+      - ./db:/config
+      - ./db_backup:/backup
+    restart: always
+    environment:
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_ROOT_PASSWORD=${NEXT_CLOUD_MYSQL_ROOT_PASSWORD}
+      - MYSQL_PASSWORD=${NEXT_CLOUD_MYSQL_PASSWORD}
+      - MYSQL_USER=nextcloud
+    networks:
+      - mynet
+
+  nextcloud:
+    image: nextcloud
+    container_name: nextcloud
+    ports:
+      - 8787:80
+    volumes:
+      - ./html:/var/www/html
+      - /media/extrnalHdd/nextcloud:/externalHdd 
+    restart: always
+    environment:
+      - MYSQL_DATABASE=nextcloud 
+      - MYSQL_PASSWORD=${NEXT_CLOUD_MYSQL_PASSWORD}
+      - MYSQL_HOST=nextcloud_db
+      - MYSQL_USER=nextcloud
+    depends_on:
+      - nextcloud_db
+    networks:
+      - default
+      - mynet
+
+networks:
+    default:
+      driver: bridge
+      ipam:
+        driver: default
+
+    mynet:
+      driver: bridge
+      internal: true
+      ipam:
+        driver: default

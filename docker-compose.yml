@@ -22,6 +22,7 @@ services:
     volumes:
       - ${NEXTCLOUD_CONFIG_FOLDER}:/var/www/html
       - ${NEXTCLOUD_DATA_FOLDER}:/var/www/html/data/
+      - /data:/data/
     environment:
       - VIRTUAL_HOST=${DOMAIN_NAME}
       - LETSENCRYPT_HOST=${DOMAIN_NAME}

@@ -25,6 +25,9 @@ services:
     environment:
       - VIRTUAL_HOST=${DOMAIN_NAME}
       - LETSENCRYPT_HOST=${DOMAIN_NAME}
+      - TRUSTED_PROXIES=127.0.0.1
+      - OVERWRITEHOST=${DOMAIN_NAME}
+      - OVERWRITEPROTOCOL=https
     restart: always
 
   nginx-proxy:

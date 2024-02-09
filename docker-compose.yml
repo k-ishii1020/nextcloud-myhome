@@ -1,49 +1,63 @@
-version: '3.8'
+version: '3'
 
 services:
-  nextcloud_db:
-    image: yobasystems/alpine-mariadb
-    container_name: nextcloud_db
-    volumes:
-      - ./db:/config
-      - ./db_backup:/backup
+  db:
+    image: mariadb
+    container_name: db
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW --innodb-file-per-table=1 --skip-innodb-read-only-compressed
     restart: always
+    volumes:
+      - ./db:/var/lib/mysql
     environment:
+      - MYSQL_ROOT_PASSWORD=${ENV_MYSQL_ROOT_PASSWORD}
+      - MYSQL_PASSWORD=${ENV_MYSQL_PASSWORD}
       - MYSQL_DATABASE=nextcloud
-      - MYSQL_ROOT_PASSWORD=${NEXT_CLOUD_MYSQL_ROOT_PASSWORD}
-      - MYSQL_PASSWORD=${NEXT_CLOUD_MYSQL_PASSWORD}
       - MYSQL_USER=nextcloud
-    networks:
-      - mynet
 
   nextcloud:
     image: nextcloud
     container_name: nextcloud
-    ports:
-      - 8787:80
+    links:
+      - db
     volumes:
-      - ./html:/var/www/html
-      - /media/extrnalHdd/nextcloud:/externalHdd 
-    restart: always
+      - ${NEXTCLOUD_CONFIG_FOLDER}:/var/www/html
+      - ${NEXTCLOUD_DATA_FOLDER}:/var/www/html/data/
     environment:
-      - MYSQL_DATABASE=nextcloud 
-      - MYSQL_PASSWORD=${NEXT_CLOUD_MYSQL_PASSWORD}
-      - MYSQL_HOST=nextcloud_db
-      - MYSQL_USER=nextcloud
+      - VIRTUAL_HOST=${DOMAIN_NAME}
+      - LETSENCRYPT_HOST=${DOMAIN_NAME}
+    restart: always
+
+  nginx-proxy:
+    image: nginxproxy/nginx-proxy
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./proxy/conf:/etc/nginx/conf.d
+      - ./proxy/vhost:/etc/nginx/vhost.d
+      - ./proxy/html:/usr/share/nginx/html
+      - ./certs:/etc/nginx/certs:ro
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./proxy/conf/proxy.conf:/etc/nginx/conf.d/proxy.conf:ro
+    environment:
+      DEFAULT_HOST: ${DOMAIN_NAME}
+      HTTPS_METHOD: noredirect
+    links:
+      - nextcloud
     depends_on:
-      - nextcloud_db
-    networks:
-      - default
-      - mynet
+      - nextcloud
+    restart: always
 
-networks:
-    default:
-      driver: bridge
-      ipam:
-        driver: default
-
-    mynet:
-      driver: bridge
-      internal: true
-      ipam:
-        driver: default
+  acme-companion:
+    image: nginxproxy/acme-companion
+    container_name: nginx-proxy-acme
+    volumes_from:
+      - nginx-proxy
+    volumes:
+      - ./certs:/etc/nginx/certs:rw
+      - ./proxy/vhost:/etc/nginx/vhost.d
+      - ./proxy/html:/usr/share/nginx/html
+      - ./acme:/etc/acme.sh
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: always
